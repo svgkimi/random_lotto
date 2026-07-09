@@ -3,6 +3,12 @@ from tkinter import font as tkfont
 import random
 import time
 import threading
+import requests
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+API_KEY = os.getenv("OPENWEATHER_API_KEY", "")
 
 # ── 토스 컬러 팔레트 ─────────────────────────────────────
 TOSS_BLUE    = "#0064FF"
@@ -148,38 +154,75 @@ class BallCanvas(tk.Canvas):
 class LottoApp(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("로또 번호 추첨기")
+        self.title("🍀 로또 & 날씨")
         self.resizable(False, False)
         self.configure(bg=TOSS_BG)
 
         # 창 크기 & 중앙 정렬
-        w, h = 420, 720
+        w, h = 420, 760
         sw, sh = self.winfo_screenwidth(), self.winfo_screenheight()
         self.geometry(f"{w}x{h}+{(sw-w)//2}+{(sh-h)//2}")
 
-        self.numbers    = []
-        self.history    = []
-        self.is_drawing = False
+        # ── 탭 바 ──
+        tab_bar = tk.Frame(self, bg=TOSS_WHITE, height=56)
+        tab_bar.pack(fill="x")
+        tab_bar.pack_propagate(False)
 
-        self._build_ui()
+        self.tab_lotto_btn = tk.Label(
+            tab_bar, text="🎲 로또", bg=TOSS_WHITE, fg=TOSS_BLUE,
+            font=("Apple SD Gothic Neo", 14, "bold"), cursor="hand2"
+        )
+        self.tab_lotto_btn.pack(side="left", expand=True, fill="both")
+        self.tab_lotto_btn.bind("<Button-1>", lambda e: self._show_tab("lotto"))
 
-    # ────────────────────────────────────────
-    #  UI 구성
-    # ────────────────────────────────────────
-    def _build_ui(self):
-        # ── 상단 헤더 ──
-        header = tk.Frame(self, bg=TOSS_WHITE, height=64)
-        header.pack(fill="x")
-        header.pack_propagate(False)
-        tk.Label(header, text="🍀  로또 번호 추첨기",
-                 bg=TOSS_WHITE, fg=TOSS_BLACK,
-                 font=("Apple SD Gothic Neo", 18, "bold")).pack(expand=True)
+        self.tab_weather_btn = tk.Label(
+            tab_bar, text="☁️ 날씨", bg=TOSS_WHITE, fg=TOSS_GRAY2,
+            font=("Apple SD Gothic Neo", 14), cursor="hand2"
+        )
+        self.tab_weather_btn.pack(side="left", expand=True, fill="both")
+        self.tab_weather_btn.bind("<Button-1>", lambda e: self._show_tab("weather"))
+
+        # 탭 언더라인
+        self.tab_indicator = tk.Frame(self, bg=TOSS_BLUE, height=3)
+        self.tab_indicator.place(x=0, y=56, width=210)
 
         # ── 구분선 ──
         tk.Frame(self, bg="#E8EAED", height=1).pack(fill="x")
 
-        # ── 메인 스크롤 영역 ──
-        main = tk.Frame(self, bg=TOSS_BG)
+        # ── 컨텐츠 컨테이너 ──
+        self.content = tk.Frame(self, bg=TOSS_BG)
+        self.content.pack(fill="both", expand=True)
+
+        self._build_lotto_tab()
+        self._build_weather_tab()
+        self._show_tab("lotto")
+
+    def _show_tab(self, tab):
+        self.current_tab = tab
+        if tab == "lotto":
+            self.lotto_frame.pack(fill="both", expand=True)
+            self.weather_frame.pack_forget()
+            self.tab_lotto_btn.config(fg=TOSS_BLUE,
+                font=("Apple SD Gothic Neo", 14, "bold"))
+            self.tab_weather_btn.config(fg=TOSS_GRAY2,
+                font=("Apple SD Gothic Neo", 14))
+            self.tab_indicator.place(x=0, y=56, width=210)
+        else:
+            self.weather_frame.pack(fill="both", expand=True)
+            self.lotto_frame.pack_forget()
+            self.tab_lotto_btn.config(fg=TOSS_GRAY2,
+                font=("Apple SD Gothic Neo", 14))
+            self.tab_weather_btn.config(fg=TOSS_BLUE,
+                font=("Apple SD Gothic Neo", 14, "bold"))
+            self.tab_indicator.place(x=210, y=56, width=210)
+
+    # ────────────────────────────────────────
+    #  로또 탭
+    # ────────────────────────────────────────
+    def _build_lotto_tab(self):
+        self.lotto_frame = tk.Frame(self.content, bg=TOSS_BG)
+
+        main = tk.Frame(self.lotto_frame, bg=TOSS_BG)
         main.pack(fill="both", expand=True, padx=20, pady=20)
 
         # ── 카드: 이번 회차 번호 ──
@@ -235,6 +278,177 @@ class LottoApp(tk.Tk):
         self.hist_frame.pack(fill="x", padx=20, pady=(0, 16))
 
         self._show_empty_history()
+
+    # ────────────────────────────────────────
+    #  날씨 탭
+    # ────────────────────────────────────────
+    def _build_weather_tab(self):
+        self.weather_frame = tk.Frame(self.content, bg=TOSS_BG)
+
+        main = tk.Frame(self.weather_frame, bg=TOSS_BG)
+        main.pack(fill="both", expand=True, padx=20, pady=20)
+
+        # ── 검색 카드 ──
+        search_card = tk.Frame(main, bg=TOSS_WHITE)
+        search_card.pack(fill="x", pady=(0, 16))
+        self._add_shadow(search_card)
+
+        tk.Label(search_card, text="도시 이름으로 날씨 검색",
+                 bg=TOSS_WHITE, fg=TOSS_GRAY2,
+                 font=("Apple SD Gothic Neo", 12)).pack(anchor="w", padx=20, pady=(16, 8))
+
+        search_row = tk.Frame(search_card, bg=TOSS_WHITE)
+        search_row.pack(fill="x", padx=20, pady=(0, 16))
+
+        self.city_entry = tk.Entry(
+            search_row,
+            font=("Apple SD Gothic Neo", 14),
+            relief="flat", bd=0,
+            bg=TOSS_GRAY1, fg=TOSS_BLACK,
+            insertbackground=TOSS_BLACK
+        )
+        self.city_entry.pack(side="left", fill="x", expand=True,
+                              ipady=10, ipadx=12)
+        self.city_entry.insert(0, "Seoul")
+        self.city_entry.bind("<Return>", lambda e: self._fetch_weather())
+
+        search_btn = RoundedButton(
+            search_row, text="검색",
+            command=self._fetch_weather,
+            width=72, height=42,
+            bg=TOSS_BLUE, fg="#fff", radius=10, font_size=13
+        )
+        search_btn.pack(side="left", padx=(8, 0))
+
+        # ── 날씨 결과 카드 ──
+        self.wx_card = tk.Frame(main, bg=TOSS_WHITE)
+        self.wx_card.pack(fill="x", pady=(0, 16))
+        self._add_shadow(self.wx_card)
+
+        self.wx_icon_label = tk.Label(
+            self.wx_card, text="☁️",
+            bg=TOSS_WHITE, font=("Apple SD Gothic Neo", 52)
+        )
+        self.wx_icon_label.pack(pady=(20, 4))
+
+        self.wx_city_label = tk.Label(
+            self.wx_card, text="도시를 검색해보세요",
+            bg=TOSS_WHITE, fg=TOSS_BLACK,
+            font=("Apple SD Gothic Neo", 18, "bold")
+        )
+        self.wx_city_label.pack()
+
+        self.wx_temp_label = tk.Label(
+            self.wx_card, text="--°C",
+            bg=TOSS_WHITE, fg=TOSS_BLUE,
+            font=("Apple SD Gothic Neo", 42, "bold")
+        )
+        self.wx_temp_label.pack(pady=(4, 0))
+
+        self.wx_desc_label = tk.Label(
+            self.wx_card, text="",
+            bg=TOSS_WHITE, fg=TOSS_GRAY2,
+            font=("Apple SD Gothic Neo", 13)
+        )
+        self.wx_desc_label.pack(pady=(2, 16))
+
+        # ── 세부 정보 ──
+        detail_frame = tk.Frame(self.wx_card, bg=TOSS_GRAY1)
+        detail_frame.pack(fill="x", padx=20, pady=(0, 20))
+
+        detail_inner = tk.Frame(detail_frame, bg=TOSS_GRAY1)
+        detail_inner.pack(padx=16, pady=12)
+
+        self.wx_humidity = self._detail_item(detail_inner, "💧 습도", "--")
+        self.wx_feels    = self._detail_item(detail_inner, "🌡 체감온도", "--")
+        self.wx_wind     = self._detail_item(detail_inner, "💨 풍속", "--")
+        self.wx_minmax   = self._detail_item(detail_inner, "📊 최저/최고", "--")
+
+        # ── 상태 메시지 ──
+        self.wx_status = tk.Label(
+            main, text="", bg=TOSS_BG,
+            fg=TOSS_GRAY2, font=("Apple SD Gothic Neo", 11)
+        )
+        self.wx_status.pack()
+
+    def _detail_item(self, parent, label, value):
+        row = tk.Frame(parent, bg=TOSS_GRAY1)
+        row.pack(fill="x", pady=3)
+        tk.Label(row, text=label, bg=TOSS_GRAY1, fg=TOSS_GRAY3,
+                 font=("Apple SD Gothic Neo", 12), width=12, anchor="w").pack(side="left")
+        val_label = tk.Label(row, text=value, bg=TOSS_GRAY1, fg=TOSS_BLACK,
+                             font=("Apple SD Gothic Neo", 12, "bold"), anchor="e")
+        val_label.pack(side="right")
+        return val_label
+
+    def _fetch_weather(self):
+        city = self.city_entry.get().strip()
+        if not city:
+            return
+        self.wx_status.config(text="날씨 정보를 불러오는 중...", fg=TOSS_GRAY2)
+        threading.Thread(target=self._call_weather_api, args=(city,), daemon=True).start()
+
+    def _call_weather_api(self, city):
+        if not API_KEY or API_KEY == "여기에_API_키_입력":
+            self.after(0, lambda: self.wx_status.config(
+                text="⚠️ .env 파일에 OPENWEATHER_API_KEY를 입력해주세요!", fg=TOSS_RED))
+            return
+        try:
+            url = "https://api.openweathermap.org/data/2.5/weather"
+            params = {
+                "q": city,
+                "appid": API_KEY,
+                "units": "metric",
+                "lang": "kr"
+            }
+            resp = requests.get(url, params=params, timeout=5)
+            if resp.status_code == 401:
+                self.after(0, lambda: self.wx_status.config(
+                    text="❌ API 키가 올바르지 않습니다.", fg=TOSS_RED))
+                return
+            if resp.status_code == 404:
+                self.after(0, lambda: self.wx_status.config(
+                    text=f"❌ '{city}' 도시를 찾을 수 없습니다.", fg=TOSS_RED))
+                return
+            resp.raise_for_status()
+            data = resp.json()
+            self.after(0, lambda: self._update_weather_ui(data))
+        except requests.exceptions.ConnectionError:
+            self.after(0, lambda: self.wx_status.config(
+                text="❌ 인터넷 연결을 확인해주세요.", fg=TOSS_RED))
+        except Exception as e:
+            self.after(0, lambda: self.wx_status.config(
+                text=f"❌ 오류: {e}", fg=TOSS_RED))
+
+    def _update_weather_ui(self, data):
+        # 날씨 아이콘 매핑
+        icon_map = {
+            "Clear": "☀️", "Clouds": "☁️", "Rain": "🌧️",
+            "Drizzle": "🌦️", "Thunderstorm": "⛈️", "Snow": "❄️",
+            "Mist": "🌫️", "Fog": "🌫️", "Haze": "🌫️",
+        }
+        main_w   = data["weather"][0]["main"]
+        desc     = data["weather"][0]["description"]
+        temp     = data["main"]["temp"]
+        feels    = data["main"]["feels_like"]
+        humidity = data["main"]["humidity"]
+        wind     = data["wind"]["speed"]
+        t_min    = data["main"]["temp_min"]
+        t_max    = data["main"]["temp_max"]
+        city_name = data["name"]
+        country   = data["sys"]["country"]
+
+        icon = icon_map.get(main_w, "🌡")
+
+        self.wx_icon_label.config(text=icon)
+        self.wx_city_label.config(text=f"{city_name}, {country}")
+        self.wx_temp_label.config(text=f"{temp:.1f}°C")
+        self.wx_desc_label.config(text=desc)
+        self.wx_humidity.config(text=f"{humidity}%")
+        self.wx_feels.config(text=f"{feels:.1f}°C")
+        self.wx_wind.config(text=f"{wind} m/s")
+        self.wx_minmax.config(text=f"{t_min:.1f}° / {t_max:.1f}°")
+        self.wx_status.config(text="✅ 업데이트 완료!", fg=TOSS_GREEN)
 
     def _add_shadow(self, frame):
         """카드 외곽선 효과"""
