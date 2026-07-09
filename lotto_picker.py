@@ -154,12 +154,12 @@ class BallCanvas(tk.Canvas):
 class LottoApp(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("🍀 로또 & 날씨")
+        self.title("🍀 로또 & 날씨 & BMI")
         self.resizable(False, False)
         self.configure(bg=TOSS_BG)
 
         # 창 크기 & 중앙 정렬
-        w, h = 420, 760
+        w, h = 420, 780
         sw, sh = self.winfo_screenwidth(), self.winfo_screenheight()
         self.geometry(f"{w}x{h}+{(sw-w)//2}+{(sh-h)//2}")
 
@@ -170,21 +170,28 @@ class LottoApp(tk.Tk):
 
         self.tab_lotto_btn = tk.Label(
             tab_bar, text="🎲 로또", bg=TOSS_WHITE, fg=TOSS_BLUE,
-            font=("Apple SD Gothic Neo", 14, "bold"), cursor="hand2"
+            font=("Apple SD Gothic Neo", 13, "bold"), cursor="hand2"
         )
         self.tab_lotto_btn.pack(side="left", expand=True, fill="both")
         self.tab_lotto_btn.bind("<Button-1>", lambda e: self._show_tab("lotto"))
 
         self.tab_weather_btn = tk.Label(
             tab_bar, text="☁️ 날씨", bg=TOSS_WHITE, fg=TOSS_GRAY2,
-            font=("Apple SD Gothic Neo", 14), cursor="hand2"
+            font=("Apple SD Gothic Neo", 13), cursor="hand2"
         )
         self.tab_weather_btn.pack(side="left", expand=True, fill="both")
         self.tab_weather_btn.bind("<Button-1>", lambda e: self._show_tab("weather"))
 
+        self.tab_bmi_btn = tk.Label(
+            tab_bar, text="⚖️ BMI", bg=TOSS_WHITE, fg=TOSS_GRAY2,
+            font=("Apple SD Gothic Neo", 13), cursor="hand2"
+        )
+        self.tab_bmi_btn.pack(side="left", expand=True, fill="both")
+        self.tab_bmi_btn.bind("<Button-1>", lambda e: self._show_tab("bmi"))
+
         # 탭 언더라인
         self.tab_indicator = tk.Frame(self, bg=TOSS_BLUE, height=3)
-        self.tab_indicator.place(x=0, y=56, width=210)
+        self.tab_indicator.place(x=0, y=56, width=140)
 
         # ── 구분선 ──
         tk.Frame(self, bg="#E8EAED", height=1).pack(fill="x")
@@ -195,26 +202,34 @@ class LottoApp(tk.Tk):
 
         self._build_lotto_tab()
         self._build_weather_tab()
+        self._build_bmi_tab()
         self._show_tab("lotto")
 
     def _show_tab(self, tab):
         self.current_tab = tab
+        # 모든 탭 숨기기
+        self.lotto_frame.pack_forget()
+        self.weather_frame.pack_forget()
+        self.bmi_frame.pack_forget()
+        # 모든 탭 버튼 초기화
+        for btn in [self.tab_lotto_btn, self.tab_weather_btn, self.tab_bmi_btn]:
+            btn.config(fg=TOSS_GRAY2, font=("Apple SD Gothic Neo", 13))
+
         if tab == "lotto":
             self.lotto_frame.pack(fill="both", expand=True)
-            self.weather_frame.pack_forget()
             self.tab_lotto_btn.config(fg=TOSS_BLUE,
-                font=("Apple SD Gothic Neo", 14, "bold"))
-            self.tab_weather_btn.config(fg=TOSS_GRAY2,
-                font=("Apple SD Gothic Neo", 14))
-            self.tab_indicator.place(x=0, y=56, width=210)
-        else:
+                font=("Apple SD Gothic Neo", 13, "bold"))
+            self.tab_indicator.place(x=0, y=56, width=140)
+        elif tab == "weather":
             self.weather_frame.pack(fill="both", expand=True)
-            self.lotto_frame.pack_forget()
-            self.tab_lotto_btn.config(fg=TOSS_GRAY2,
-                font=("Apple SD Gothic Neo", 14))
             self.tab_weather_btn.config(fg=TOSS_BLUE,
-                font=("Apple SD Gothic Neo", 14, "bold"))
-            self.tab_indicator.place(x=210, y=56, width=210)
+                font=("Apple SD Gothic Neo", 13, "bold"))
+            self.tab_indicator.place(x=140, y=56, width=140)
+        else:
+            self.bmi_frame.pack(fill="both", expand=True)
+            self.tab_bmi_btn.config(fg=TOSS_BLUE,
+                font=("Apple SD Gothic Neo", 13, "bold"))
+            self.tab_indicator.place(x=280, y=56, width=140)
 
     # ────────────────────────────────────────
     #  로또 탭
@@ -450,7 +465,140 @@ class LottoApp(tk.Tk):
         self.wx_minmax.config(text=f"{t_min:.1f}° / {t_max:.1f}°")
         self.wx_status.config(text="✅ 업데이트 완료!", fg=TOSS_GREEN)
 
+    # ────────────────────────────────────────
+    #  BMI 탭
+    # ────────────────────────────────────────
+    def _build_bmi_tab(self):
+        self.bmi_frame = tk.Frame(self.content, bg=TOSS_BG)
+
+        main = tk.Frame(self.bmi_frame, bg=TOSS_BG)
+        main.pack(fill="both", expand=True, padx=20, pady=20)
+
+        # ── 입력 카드 ──
+        input_card = tk.Frame(main, bg=TOSS_WHITE)
+        input_card.pack(fill="x", pady=(0, 16))
+        self._add_shadow(input_card)
+
+        tk.Label(input_card, text="체질량지수(BMI) 계산기",
+                 bg=TOSS_WHITE, fg=TOSS_GRAY2,
+                 font=("Apple SD Gothic Neo", 12)).pack(anchor="w", padx=20, pady=(16, 12))
+
+        # 키 입력
+        height_row = tk.Frame(input_card, bg=TOSS_WHITE)
+        height_row.pack(fill="x", padx=20, pady=(0, 8))
+        tk.Label(height_row, text="키", bg=TOSS_WHITE, fg=TOSS_GRAY3,
+                 font=("Apple SD Gothic Neo", 13), width=6, anchor="w").pack(side="left")
+        self.bmi_height = tk.Entry(height_row,
+                                   font=("Apple SD Gothic Neo", 14),
+                                   relief="flat", bd=0,
+                                   bg=TOSS_GRAY1, fg=TOSS_BLACK,
+                                   insertbackground=TOSS_BLACK)
+        self.bmi_height.pack(side="left", fill="x", expand=True, ipady=8, ipadx=10)
+        tk.Label(height_row, text="cm", bg=TOSS_WHITE, fg=TOSS_GRAY2,
+                 font=("Apple SD Gothic Neo", 12)).pack(side="left", padx=(8, 0))
+
+        # 몸무게 입력
+        weight_row = tk.Frame(input_card, bg=TOSS_WHITE)
+        weight_row.pack(fill="x", padx=20, pady=(0, 16))
+        tk.Label(weight_row, text="몸무게", bg=TOSS_WHITE, fg=TOSS_GRAY3,
+                 font=("Apple SD Gothic Neo", 13), width=6, anchor="w").pack(side="left")
+        self.bmi_weight = tk.Entry(weight_row,
+                                   font=("Apple SD Gothic Neo", 14),
+                                   relief="flat", bd=0,
+                                   bg=TOSS_GRAY1, fg=TOSS_BLACK,
+                                   insertbackground=TOSS_BLACK)
+        self.bmi_weight.pack(side="left", fill="x", expand=True, ipady=8, ipadx=10)
+        tk.Label(weight_row, text="kg", bg=TOSS_WHITE, fg=TOSS_GRAY2,
+                 font=("Apple SD Gothic Neo", 12)).pack(side="left", padx=(8, 0))
+
+        # 계산 버튼
+        RoundedButton(main, text="⚖️  BMI 계산하기",
+                      command=self._calculate_bmi,
+                      width=380, height=52,
+                      bg=TOSS_BLUE, fg="#fff", radius=16).pack(pady=(0, 16))
+
+        # ── 결과 카드 ──
+        result_card = tk.Frame(main, bg=TOSS_WHITE)
+        result_card.pack(fill="x")
+        self._add_shadow(result_card)
+
+        self.bmi_emoji = tk.Label(result_card, text="🙂",
+                                   bg=TOSS_WHITE,
+                                   font=("Apple SD Gothic Neo", 48))
+        self.bmi_emoji.pack(pady=(20, 4))
+
+        self.bmi_value_label = tk.Label(result_card, text="--",
+                                        bg=TOSS_WHITE, fg=TOSS_BLUE,
+                                        font=("Apple SD Gothic Neo", 40, "bold"))
+        self.bmi_value_label.pack()
+
+        self.bmi_category_label = tk.Label(result_card, text="키와 몸무게를 입력해주세요",
+                                           bg=TOSS_WHITE, fg=TOSS_GRAY2,
+                                           font=("Apple SD Gothic Neo", 14))
+        self.bmi_category_label.pack(pady=(4, 0))
+
+        # BMI 범위 안내
+        guide_frame = tk.Frame(result_card, bg=TOSS_GRAY1)
+        guide_frame.pack(fill="x", padx=20, pady=(16, 20))
+        guide_inner = tk.Frame(guide_frame, bg=TOSS_GRAY1)
+        guide_inner.pack(padx=16, pady=10)
+
+        guides = [
+            ("저체중", "~ 18.4", "#69C8F2"),
+            ("정상",   "18.5 ~ 22.9", TOSS_GREEN),
+            ("과체중", "23 ~ 24.9", TOSS_YELLOW),
+            ("비만",   "25 ~ 29.9", "#FF7272"),
+            ("고도비만", "30 ~", TOSS_RED),
+        ]
+        for label, rng, color in guides:
+            row = tk.Frame(guide_inner, bg=TOSS_GRAY1)
+            row.pack(fill="x", pady=2)
+            dot = tk.Canvas(row, width=10, height=10, bg=TOSS_GRAY1, highlightthickness=0)
+            dot.pack(side="left", padx=(0, 6))
+            dot.create_oval(1, 1, 9, 9, fill=color, outline=color)
+            tk.Label(row, text=label, bg=TOSS_GRAY1, fg=TOSS_GRAY3,
+                     font=("Apple SD Gothic Neo", 11), width=7, anchor="w").pack(side="left")
+            tk.Label(row, text=rng, bg=TOSS_GRAY1, fg=TOSS_GRAY2,
+                     font=("Apple SD Gothic Neo", 11)).pack(side="right")
+
+        self.bmi_status = tk.Label(main, text="", bg=TOSS_BG,
+                                   fg=TOSS_RED, font=("Apple SD Gothic Neo", 11))
+        self.bmi_status.pack(pady=(8, 0))
+
+    def _calculate_bmi(self):
+        try:
+            height = float(self.bmi_height.get())
+            weight = float(self.bmi_weight.get())
+        except ValueError:
+            self.bmi_status.config(text="❌ 숫자만 입력해주세요.")
+            return
+
+        if height <= 0 or weight <= 0:
+            self.bmi_status.config(text="❌ 0보다 큰 값을 입력해주세요.")
+            return
+
+        self.bmi_status.config(text="")
+        bmi = weight / ((height / 100) ** 2)
+
+        # 분류 & 색상
+        if bmi < 18.5:
+            category, color, emoji = "저체중", "#69C8F2", "😟"
+        elif bmi < 23:
+            category, color, emoji = "정상",   TOSS_GREEN,  "😊"
+        elif bmi < 25:
+            category, color, emoji = "과체중", TOSS_YELLOW, "😐"
+        elif bmi < 30:
+            category, color, emoji = "비만",   "#FF7272",   "😥"
+        else:
+            category, color, emoji = "고도비만", TOSS_RED,  "😰"
+
+        self.bmi_value_label.config(text=f"{bmi:.1f}", fg=color)
+        self.bmi_category_label.config(text=category, fg=color,
+                                       font=("Apple SD Gothic Neo", 16, "bold"))
+        self.bmi_emoji.config(text=emoji)
+
     def _add_shadow(self, frame):
+
         """카드 외곽선 효과"""
         frame.configure(
             highlightbackground="#E8EAED",
