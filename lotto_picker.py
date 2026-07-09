@@ -155,13 +155,17 @@ class LottoApp(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("🍀 로또 & 날씨 & BMI")
-        self.resizable(False, False)
+        self.resizable(True, True)
         self.configure(bg=TOSS_BG)
 
         # 창 크기 & 중앙 정렬
-        w, h = 420, 780
+        w, h = 480, 840
         sw, sh = self.winfo_screenwidth(), self.winfo_screenheight()
         self.geometry(f"{w}x{h}+{(sw-w)//2}+{(sh-h)//2}")
+
+        self.numbers    = []
+        self.history    = []
+        self.is_drawing = False
 
         # ── 탭 바 ──
         tab_bar = tk.Frame(self, bg=TOSS_WHITE, height=56)
